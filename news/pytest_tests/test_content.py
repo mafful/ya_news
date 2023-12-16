@@ -3,7 +3,6 @@ import pytest
 from django.urls import reverse
 
 from news.forms import CommentForm
-from .conftest import author
 
 pytestmark = pytest.mark.django_db
 
@@ -12,7 +11,6 @@ DETAIL_URL = 'news:detail'
 
 FORM_DATA = {
     'text': 'Новый текст',
-    'author': author,
 }
 
 
@@ -64,13 +62,14 @@ def test_existing_of_form_for_client(client, news_detail_url):
     assert 'form' not in response.context
 
 
-def test_existing_of_form_for_admin_client(admin_client, news):
+def test_existing_of_form_for_admin_client(author, author_client, news):
     """
     авторизованному пользователю доступна форма
     для отправки комментария на странице отдельной новости
     """
     url = reverse(DETAIL_URL, args=(news.pk,))
-    response = admin_client.get(url, data=FORM_DATA)
+    FORM_DATA['author'] = author
+    response = author_client.get(url, data=FORM_DATA)
     assert 'form' in response.context
     form = response.context['form']
     assert isinstance(form, CommentForm)
