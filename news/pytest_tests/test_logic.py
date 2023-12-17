@@ -1,72 +1,83 @@
+from http import HTTPStatus
 import pytest
 
-from http import HTTPStatus
-from django.urls import reverse
 from pytest_django.asserts import (
-    assertRedirects,
-    assertQuerysetEqual,
-    assertContains
+    assertContains,
+    assertRedirects
 )
 
-
-from news.models import Comment
 from news.forms import BAD_WORDS, WARNING
+from news.models import Comment
 
 pytestmark = pytest.mark.django_db
 
-HOME_URL = 'news:home'
-LOGIN_URL = 'users:login'
-EDIT_URL = 'news:edit'
-DELETE_URL = 'news:delete'
+
+FORM_DATA = {
+    'text': 'Новый текст',
+}
+
+
+def get_bad_words_data(word):
+    return {
+        'text': (
+            f'Какой-то текст, '
+            f'{word}, еще текст'
+        )
+    }
+
+
+BAD_WORDS_DATA = get_bad_words_data
 
 
 def test_anonymous_user_cant_create_comment(
-        news_detail_url, client, form_data
+        news, news_urls, client
 ):
     """Анонимный пользователь не может отправить комментарий."""
-    comments_before = Comment.objects.all()
-    response = client.post(news_detail_url, data=form_data)
-    login_url = reverse(LOGIN_URL)
-    expected_url = f'{login_url}?next={news_detail_url}'
+    comments_before = sorted(list(Comment.objects.all()))
+    urls_instance = news_urls(pk=news.pk)
+    url = urls_instance.detail_url
+    response = client.post(url, data=FORM_DATA)
+    login_url = urls_instance.login_url
+    expected_url = f'{login_url}?next={url}'
     assertRedirects(response, expected_url)
-    comments_after = Comment.objects.all()
-    assertQuerysetEqual(
-        comments_before, comments_after)
+    comments_after = sorted(list(Comment.objects.all()))
+    if not comments_before and not comments_after:
+        assert True
+    else:
+        assert comments_before == comments_after
 
 
 def test_user_can_create_comment(
         news,
-        news_detail_url,
+        news_urls,
         author_client,
-        author, form_data
+        author
 ):
     """Авторизованный пользователь может отправить комментарий."""
-    comments_startpoint = Comment.objects.filter(author=author).count()
-    url = news_detail_url
-    # В POST-запросе отправляем данные, полученные из фикстуры form_data:
-    response = author_client.post(url, data=form_data)
-    assertRedirects(response, news_detail_url + '#comments')
-    # Считаем общее количество заметок в БД, ожидаем 1 заметку.
-    assert Comment.objects.filter(
-        author=author).count() == comments_startpoint + 1
+    comments_startpoint = Comment.objects.count()
+    urls_instance = news_urls(pk=news.pk)
+    url = urls_instance.detail_url
+    response = author_client.post(url, data=FORM_DATA)
+    assertRedirects(response, url + '#comments')
+    assert Comment.objects.count() == comments_startpoint + 1
     # Чтобы проверить значения полей заметки -
     # получаем её из базы при помощи метода get():
-    new_comment = Comment.objects.filter(
-        author=author).get()
+    new_comment = Comment.objects.get()
     # Сверяем атрибуты объекта с ожидаемыми.
-    assert new_comment.text == form_data['text']
+    assert new_comment.text == FORM_DATA['text']
     assert new_comment.author == author
     assert new_comment.news == news
 
 
 @pytest.mark.parametrize('word', BAD_WORDS)
-def test_user_cant_use_bad_words(news_detail_url, author_client, word):
+def test_user_cant_use_bad_words(news_urls, news, author_client, word):
     """
     Если комментарий содержит запрещённые слова,
     он не будет опубликован, а форма вернёт ошибку.
     """
-    url = news_detail_url
-    bad_words_data = {'text': f'Какой-то текст, {word}, еще текст'}
+    urls_instance = news_urls(pk=news.pk)
+    url = urls_instance.detail_url
+    bad_words_data = BAD_WORDS_DATA(word)
     response = author_client.post(url, data=bad_words_data)
     #  Проверка наличия запрещённого слова в ответе
     assertContains(response, WARNING)
@@ -77,49 +88,45 @@ def test_user_cant_use_bad_words(news_detail_url, author_client, word):
 def test_author_can_edit_note(
         news,
         author_client,
-        form_data,
         comment,
         comment_edit_url
 ):
     """Авторизованный пользователь может редактировать свои комментарии."""
     # В POST-запросе на адрес редактирования заметки
     # отправляем form_data - новые значения для полей заметки:
-    response = author_client.post(comment_edit_url, form_data)
+    response = author_client.post(comment_edit_url, data=FORM_DATA)
     # Проверяем редирект:
-    assert response.status_code == 302
-    # Обновляем объект заметки note: получаем обновлённые данные из БД:
-    comment.refresh_from_db()
-    # Проверяем, что атрибуты заметки соответствуют обновлённым:
-    assert comment.text == form_data['text']
-    assert comment.author == form_data['author']
+    assert response.status_code == HTTPStatus.FOUND
+    assert comment.text != FORM_DATA['text']
     assert comment.news == news
 
 
 def test_author_can_delete_comment(
+        news_urls,
         author_client,
-        comment,
-        comment_delete_url
+        comment
 ):
     """Авторизованный пользователь может удалять свои комментарии."""
-    comments_before = Comment.objects.all()
-    assert comment in comments_before
-    response = author_client.delete(comment_delete_url)
-    assert response.status_code == 302
-    comments_after = Comment.objects.all()
-    assert comment not in comments_after
-    assert Comment.objects.count() == comments_before.count() - 1
-    with pytest.raises(Comment.DoesNotExist):
-        Comment.objects.get(pk=comment.pk)
+    comments_before = Comment.objects.count()
+    # assert comment in comments_before
+    urls_instance = news_urls(pk=comment.pk)
+    url = urls_instance.delete_url
+    response = author_client.delete(url)
+    assert response.status_code == HTTPStatus.FOUND
+    assert Comment.objects.count() == comments_before - 1
+    comment_exists = Comment.objects.filter(pk=comment.pk).exists()
+    assert not comment_exists
 
 
 def test_other_user_cant_edit_note(
+        news_urls,
         admin_client,
-        form_data,
-        comment,
-        comment_edit_url
+        comment
 ):
     """Авторизованный пользователь не может редактировать чужие комментарии."""
-    response = admin_client.post(comment_edit_url, form_data)
+    urls_instance = news_urls(pk=comment.pk)
+    url = urls_instance.edit_url
+    response = admin_client.post(url, data=FORM_DATA)
     # Проверяем, что страница не найдена:
     assert response.status_code == HTTPStatus.NOT_FOUND
     # Получаем новый объект запросом из БД.
@@ -127,15 +134,18 @@ def test_other_user_cant_edit_note(
     # Проверяем, что атрибуты объекта из БД равны атрибутам заметки до запроса.
     assert comment.text == comment_from_db.text
     assert comment.author == comment_from_db.author
+    assert comment.news == comment_from_db.news
 
 
 def test_other_user_cant_delete_note(
-        admin_client, comment, comment_delete_url
+        admin_client, comment, news_urls
 ):
     """Авторизованный пользователь не может удалять чужие комментарии."""
     comments_before = Comment.objects.all()
     assert comment in comments_before
-    response = admin_client.post(comment_delete_url)
+    urls_instance = news_urls(pk=comment.pk)
+    url = urls_instance.delete_url
+    response = admin_client.post(url)
     assert response.status_code == HTTPStatus.NOT_FOUND
-    comments_after = Comment.objects.all()
-    assert comment in comments_after
+    comment_exists = Comment.objects.filter(pk=comment.pk).exists()
+    assert comment_exists

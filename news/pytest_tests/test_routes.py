@@ -1,71 +1,80 @@
-import pytest
 from http import HTTPStatus
+import pytest
 
-from django.urls import reverse
-from pytest_django.asserts import assertRedirects
-
-# Обозначаем, что тесту нужен доступ к БД.
-# Без этой метки тест выдаст ошибку доступа к БД.
 pytestmark = pytest.mark.django_db
 
-
-HOME_URL = 'news:home'
-DETAIL_URL = 'news:detail'
-EDIT_URL = 'news:edit'
-DELETE_URL = 'news:delete'
+CLIENT = pytest.lazy_fixture('client')
+ADMIN_CLIENT = pytest.lazy_fixture('admin_client')
+AUTHOR_CLIENT = pytest.lazy_fixture('author_client')
 
 
 @pytest.mark.parametrize(
-    'choosen_client', (
-        pytest.lazy_fixture('client'),
-        pytest.lazy_fixture('admin_client')
-    )
+    'choosen_client, page_name', [
+        (CLIENT, 'home'),
+        (CLIENT, 'detail'),
+        (CLIENT, 'login'),
+        (CLIENT, 'logout'),
+        (CLIENT, 'signup'),
+        (ADMIN_CLIENT, 'home'),
+        (ADMIN_CLIENT, 'detail'),
+        (ADMIN_CLIENT, 'login'),
+        (ADMIN_CLIENT, 'logout'),
+        (ADMIN_CLIENT, 'signup'),
+    ]
 )
-@pytest.mark.parametrize(
-    'name', (
-        HOME_URL,
-        DETAIL_URL,
-        'users:login',
-        'users:logout',
-        'users:signup'),
-)
-def test_page_availability_for_any_user(choosen_client, name, news_detail_url):
-    """Доступность страниц YaNote for any user"""
-    if name == DETAIL_URL:
-        url = news_detail_url
+def test_page_availability_for_any_user(
+    choosen_client,
+    page_name,
+    news,
+    news_urls
+):
+    """Доступность страниц YaNews for any user"""
+    urls_instance = news_urls(pk=news.pk)
+    if page_name == 'detail':
+        url = urls_instance.detail_url
     else:
-        url = reverse(name)
+        url = getattr(urls_instance, f'{page_name}_url')
     response = choosen_client.get(url)
     assert response.status_code == HTTPStatus.OK
 
 
 @pytest.mark.parametrize(
-    'choosen_client, status', (
-        (pytest.lazy_fixture('client'), HTTPStatus.FOUND),
-        (pytest.lazy_fixture('admin_client'), HTTPStatus.NOT_FOUND),
-        (pytest.lazy_fixture('author_client'), HTTPStatus.OK)
-    )
-)
-@pytest.mark.parametrize(
-    'url, reverse_url', (
-        (EDIT_URL, pytest.lazy_fixture('comment_edit_url')),
-        (DELETE_URL, pytest.lazy_fixture('comment_delete_url'))
-    )
+    'choosen_client, expected_status, reverse_url', [
+        (CLIENT, HTTPStatus.FOUND, 'edit_url'),
+        (CLIENT, HTTPStatus.FOUND, 'delete_url'),
+        (ADMIN_CLIENT, HTTPStatus.NOT_FOUND, 'edit_url'),
+        (ADMIN_CLIENT, HTTPStatus.NOT_FOUND, 'delete_url'),
+        (AUTHOR_CLIENT, HTTPStatus.OK, 'edit_url'),
+        (AUTHOR_CLIENT, HTTPStatus.OK, 'delete_url'),
+    ]
 )
 def test_availability_for_comment_edit_and_delete(
-        url,
+        news_urls,
+        comment,
         choosen_client,
-        status,
+        expected_status,
         reverse_url
 ):
     """Доступность страниц Edit, Delete YaNews for any user"""
+    urls_instance = news_urls(pk=comment.pk)
+    url = getattr(urls_instance, reverse_url)
+
     if choosen_client == 'client':
-        login_url = reverse('users:login')
-        url = reverse_url
-        expected_url = f'{login_url}?next={url}'
+        expected_url = urls_instance.get_expected_url(
+            choosen_client, reverse_url)
         response = choosen_client.get(url)
-        assertRedirects(response, expected_url)
+        assert response.status_code == expected_status
+        assert str(response.url) == expected_url
     else:
-        url = reverse_url
         response = choosen_client.get(url)
-        assert response.status_code == status
+        print(url)
+        assert response.status_code == expected_status
+
+
+def test_news_urls(news_urls, comment):
+    urls = news_urls(comment.pk)
+    assert urls.home_url == '/'
+    assert urls.detail_url == f'/news/{comment.pk}/'
+    assert urls.edit_url == f'/edit_comment/{comment.pk}/'
+    assert urls.delete_url == f'/delete_comment/{comment.pk}/'
+    assert urls.login_url == '/auth/login/'

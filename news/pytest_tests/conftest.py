@@ -1,15 +1,53 @@
-import pytest
 from datetime import datetime, timedelta
+import pytest
 
-from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
 from news.models import Comment, News
 
-# Текущая дата.
-today = datetime.today()
+
+@pytest.fixture
+def news_urls():
+    class NewsURLs:
+
+        def __init__(self, pk):
+            self.HOME_URL = 'news:home'
+            self.DETAIL_URL = 'news:detail'
+            self.EDIT_URL = 'news:edit'
+            self.DELETE_URL = 'news:delete'
+            self.LOGIN_URL = 'users:login'
+            self.LOGOUT_URL = 'users:logout'
+            self.SIGNUP_URL = 'users:signup'
+
+            self.home_url = reverse(self.HOME_URL)
+            self.detail_url = reverse(self.DETAIL_URL, args=(pk,))
+            self.edit_url = reverse(self.EDIT_URL, args=(pk,))
+            self.delete_url = reverse(self.DELETE_URL, args=(pk,))
+            self.login_url = reverse(self.LOGIN_URL)
+            self.logout_url = reverse(self.LOGOUT_URL)
+            self.signup_url = reverse(self.SIGNUP_URL)
+
+        def get_expected_url(self, client, reverse_url):
+            url = getattr(self, reverse_url)
+            if client == self.client:
+                return f'{self.login_url}?next={url}'
+            else:
+                return url
+
+    return NewsURLs
+
+
+@pytest.fixture
+def choosen_client(request):
+    client_type = request.param
+    if client_type == 'client':
+        return pytest.lazy_fixture('client')
+    elif client_type == 'admin_client':
+        return pytest.lazy_fixture('admin_client')
+    elif client_type == 'author_client':
+        return pytest.lazy_fixture('author_client')
 
 
 @pytest.fixture
@@ -18,45 +56,41 @@ def author(django_user_model):
 
 
 @pytest.fixture
-def author_client(author, client):  # Вызываем фикстуру автора и клиента.
+def author_client(author):
     client = Client()
-    client.force_login(author)  # Логиним автора в клиенте.
+    client.force_login(author)
     return client
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def news():
-    news = News.objects.create(  # Создаём объект заметки.
+    return News.objects.create(
         title='Новость с комментарием',
         text='Текст заметки',
     )
-    return news
-
-
-@pytest.fixture
-def news_detail_url(news):
-    return reverse('news:detail', args=(news.pk,))
 
 
 @pytest.fixture
 def all_news():
-    return [
-        News.objects.create(
+    news_objects = [
+        News(
             title=f'Новость {index}',
             text='Просто текст.',
-            date=today - timedelta(days=index))
-        for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
+            date=datetime.today() - timedelta(days=index)
+        )
+        for index in range(300)
     ]
+    News.objects.bulk_create(news_objects)
+    return news_objects
 
 
 @pytest.fixture
 def comment(news, author):
-    comment = Comment.objects.create(
+    return Comment.objects.create(
         news=news,
         author=author,
         text='Текст заметки',
     )
-    return comment
 
 
 @pytest.fixture
@@ -72,8 +106,8 @@ def comment_delete_url(comment):
 @pytest.fixture
 def comments(news, author):
     now = timezone.now()
-    return [
-        Comment.objects.create(
+    comments_objects = [
+        Comment(
             news=news,
             author=author,
             text=f'Текст заметки {index}',
@@ -81,12 +115,5 @@ def comments(news, author):
         )
         for index in range(222)
     ]
-
-
-# Добавляем фикстуру form_data
-@pytest.fixture
-def form_data(author):
-    return {
-        'text': 'Новый текст',
-        'author': author,
-    }
+    Comment.objects.bulk_create(comments_objects)
+    return comments_objects
