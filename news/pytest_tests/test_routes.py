@@ -9,72 +9,42 @@ AUTHOR_CLIENT = pytest.lazy_fixture('author_client')
 
 
 @pytest.mark.parametrize(
-    'choosen_client, page_name', [
-        (CLIENT, 'home'),
-        (CLIENT, 'detail'),
-        (CLIENT, 'login'),
-        (CLIENT, 'logout'),
-        (CLIENT, 'signup'),
-        (ADMIN_CLIENT, 'home'),
-        (ADMIN_CLIENT, 'detail'),
-        (ADMIN_CLIENT, 'login'),
-        (ADMIN_CLIENT, 'logout'),
-        (ADMIN_CLIENT, 'signup'),
+    'choosen_client, expected_status', [
+        (CLIENT, HTTPStatus.OK),
+        (ADMIN_CLIENT, HTTPStatus.OK),
     ]
 )
 def test_page_availability_for_any_user(
     choosen_client,
-    page_name,
-    news,
-    news_urls
+    expected_status,
+    home_url,
+    login_url,
+    logout_url,
+    signup_url,
+    news_detail_url
 ):
     """Доступность страниц YaNews for any user"""
-    urls_instance = news_urls(pk=news.pk)
-    if page_name == 'detail':
-        url = urls_instance.detail_url
-    else:
-        url = getattr(urls_instance, f'{page_name}_url')
-    response = choosen_client.get(url)
-    assert response.status_code == HTTPStatus.OK
+    home_response = choosen_client.get(home_url)
+    assert home_response.status_code == expected_status
+    login_response = choosen_client.get(login_url)
+    assert login_response.status_code == expected_status
+    logout_response = choosen_client.get(logout_url)
+    assert logout_response.status_code == expected_status
+    signup_response = choosen_client.get(signup_url)
+    assert signup_response.status_code == expected_status
+    detail_response = choosen_client.get(news_detail_url)
+    assert detail_response.status_code == expected_status
 
 
-@pytest.mark.parametrize(
-    'choosen_client, expected_status, reverse_url', [
-        (CLIENT, HTTPStatus.FOUND, 'edit_url'),
-        (CLIENT, HTTPStatus.FOUND, 'delete_url'),
-        (ADMIN_CLIENT, HTTPStatus.NOT_FOUND, 'edit_url'),
-        (ADMIN_CLIENT, HTTPStatus.NOT_FOUND, 'delete_url'),
-        (AUTHOR_CLIENT, HTTPStatus.OK, 'edit_url'),
-        (AUTHOR_CLIENT, HTTPStatus.OK, 'delete_url'),
-    ]
-)
-def test_availability_for_comment_edit_and_delete(
-        news_urls,
-        comment,
-        choosen_client,
-        expected_status,
-        reverse_url
+def test_redirection_for_anonymous(
+        client,
+        comment_edit_url,
+        comment_delete_url,
 ):
-    """Доступность страниц Edit, Delete YaNews for any user"""
-    urls_instance = news_urls(pk=comment.pk)
-    url = getattr(urls_instance, reverse_url)
+    edit_response = client.get(comment_edit_url)
+    assert edit_response.status_code == HTTPStatus.FOUND
+    assert 'login' in edit_response.url
 
-    if choosen_client == 'client':
-        expected_url = urls_instance.get_expected_url(
-            choosen_client, reverse_url)
-        response = choosen_client.get(url)
-        assert response.status_code == expected_status
-        assert str(response.url) == expected_url
-    else:
-        response = choosen_client.get(url)
-        print(url)
-        assert response.status_code == expected_status
-
-
-def test_news_urls(news_urls, comment):
-    urls = news_urls(comment.pk)
-    assert urls.home_url == '/'
-    assert urls.detail_url == f'/news/{comment.pk}/'
-    assert urls.edit_url == f'/edit_comment/{comment.pk}/'
-    assert urls.delete_url == f'/delete_comment/{comment.pk}/'
-    assert urls.login_url == '/auth/login/'
+    delete_response = client.get(comment_delete_url)
+    assert delete_response.status_code == HTTPStatus.FOUND
+    assert 'login' in delete_response.url

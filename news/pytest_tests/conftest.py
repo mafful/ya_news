@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import pytest
-
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -9,45 +8,35 @@ from news.models import Comment, News
 
 
 @pytest.fixture
-def news_urls():
-    class NewsURLs:
-
-        def __init__(self, pk):
-            self.HOME_URL = 'news:home'
-            self.DETAIL_URL = 'news:detail'
-            self.EDIT_URL = 'news:edit'
-            self.DELETE_URL = 'news:delete'
-            self.LOGIN_URL = 'users:login'
-            self.LOGOUT_URL = 'users:logout'
-            self.SIGNUP_URL = 'users:signup'
-
-            self.home_url = reverse(self.HOME_URL)
-            self.detail_url = reverse(self.DETAIL_URL, args=(pk,))
-            self.edit_url = reverse(self.EDIT_URL, args=(pk,))
-            self.delete_url = reverse(self.DELETE_URL, args=(pk,))
-            self.login_url = reverse(self.LOGIN_URL)
-            self.logout_url = reverse(self.LOGOUT_URL)
-            self.signup_url = reverse(self.SIGNUP_URL)
-
-        def get_expected_url(self, client, reverse_url):
-            url = getattr(self, reverse_url)
-            if client == self.client:
-                return f'{self.login_url}?next={url}'
-            else:
-                return url
-
-    return NewsURLs
+def home_url():
+    return reverse('news:home')
 
 
 @pytest.fixture
-def choosen_client(request):
+def login_url():
+    return reverse('users:login')
+
+
+@pytest.fixture
+def logout_url():
+    return reverse('users:logout')
+
+
+@pytest.fixture
+def signup_url():
+    return reverse('users:signup')
+
+
+@pytest.fixture
+def choosen_client(request, client, admin_client, author_client):
     client_type = request.param
+
     if client_type == 'client':
-        return pytest.lazy_fixture('client')
+        return client
     elif client_type == 'admin_client':
-        return pytest.lazy_fixture('admin_client')
+        return admin_client
     elif client_type == 'author_client':
-        return pytest.lazy_fixture('author_client')
+        return author_client
 
 
 @pytest.fixture
@@ -71,6 +60,11 @@ def news():
 
 
 @pytest.fixture
+def news_detail_url(news):
+    return reverse('news:detail', args=(news.pk,))
+
+
+@pytest.fixture
 def all_news():
     news_objects = [
         News(
@@ -81,7 +75,6 @@ def all_news():
         for index in range(300)
     ]
     News.objects.bulk_create(news_objects)
-    return news_objects
 
 
 @pytest.fixture
@@ -111,9 +104,8 @@ def comments(news, author):
             news=news,
             author=author,
             text=f'Текст заметки {index}',
-            created=now + timedelta(days=index),
+            created=now - timedelta(days=index),
         )
         for index in range(222)
     ]
     Comment.objects.bulk_create(comments_objects)
-    return comments_objects
