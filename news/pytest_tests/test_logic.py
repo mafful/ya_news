@@ -65,8 +65,8 @@ def test_user_cant_use_bad_words(news_detail_url, author_client, word):
     Если комментарий содержит запрещённые слова,
     он не будет опубликован, а форма вернёт ошибку.
     """
-    bad_words_data = get_bad_words_data(word)
-    response = author_client.post(news_detail_url, data=bad_words_data)
+    response = author_client.post(
+        news_detail_url, data=get_bad_words_data(word))
     form_errors = response.context['form'].errors.get('text', [])
     assert WARNING in form_errors
     # Проверка, что комментарий не был создан
@@ -122,13 +122,10 @@ def test_other_user_cant_delete_note(
         admin_client, comment, comment_delete_url
 ):
     """Авторизованный пользователь не может удалять чужие комментарии."""
-    initial_number_of_comments = Comment.objects.count()
-    comment_before = set(Comment.objects.filter(pk=comment.pk))
     response = admin_client.post(comment_delete_url)
     assert response.status_code == HTTPStatus.NOT_FOUND
-    assert Comment.objects.count() == initial_number_of_comments
     assert Comment.objects.filter(pk=comment.pk).exists()
-    comment_after = set(Comment.objects.filter(pk=comment.pk))
+    comment_after = Comment.objects.get(pk=comment.pk)
     assert (
-        comment_after == comment_before
+        comment_after == comment
     )

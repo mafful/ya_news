@@ -43,12 +43,12 @@ def test_page_availability_for_any_user(
 
 
 @pytest.mark.parametrize(
-    'url', [COMMENT_EDIT_URL, COMMENT_DELETE_URL]
+    'url', [
+        COMMENT_EDIT_URL, COMMENT_DELETE_URL
+    ]
 )
 def test_redirection_for_anonymous(
-    client, url, expected_url
+    client, login_url, url
 ):
-    response = client.get(url)
-    assert response.status_code == HTTPStatus.FOUND
-    expected = expected_url(url)
-    assert response.url == expected
+    assert client.get(url).status_code == HTTPStatus.FOUND
+    assert client.get(url).url == f'{login_url}?next={url}'

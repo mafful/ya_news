@@ -28,13 +28,6 @@ def signup_url():
 
 
 @pytest.fixture
-def expected_url(login_url):
-    def inner(url):
-        return f'{login_url}?next={url}'
-    return inner
-
-
-@pytest.fixture
 def author(django_user_model):
     return django_user_model.objects.create(username='Автор')
 
@@ -94,12 +87,10 @@ def comment_delete_url(comment):
 @pytest.fixture
 def comments(news, author):
     now = timezone.now()
-    [
+    for index in range(222):
         Comment.objects.create(
             news=news,
             author=author,
             text=f'Текст заметки {index}',
             created=now - timedelta(days=index),
         )
-        for index in range(222)
-    ]
