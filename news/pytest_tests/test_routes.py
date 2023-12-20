@@ -6,45 +6,48 @@ pytestmark = pytest.mark.django_db
 CLIENT = pytest.lazy_fixture('client')
 ADMIN_CLIENT = pytest.lazy_fixture('admin_client')
 AUTHOR_CLIENT = pytest.lazy_fixture('author_client')
+HOME_URL = pytest.lazy_fixture('home_url')
+LOGIN_URL = pytest.lazy_fixture('login_url')
+LOGOUT_URL = pytest.lazy_fixture('logout_url')
+SIGNUP_URL = pytest.lazy_fixture('signup_url')
+NEWS_DETAIL_URL = pytest.lazy_fixture('news_detail_url')
+COMMENT_EDIT_URL = pytest.lazy_fixture('comment_edit_url')
+COMMENT_DELETE_URL = pytest.lazy_fixture('comment_delete_url')
+
+
+CLIENTS_AND_URLS = [
+    (CLIENT, HOME_URL, '/', HTTPStatus.OK),
+    (CLIENT, LOGIN_URL, '/auth/login/', HTTPStatus.OK),
+    (CLIENT, LOGOUT_URL, '/auth/logout/', HTTPStatus.OK),
+    (CLIENT, SIGNUP_URL, '/auth/signup/', HTTPStatus.OK),
+    (CLIENT, NEWS_DETAIL_URL, '/news/1/', HTTPStatus.OK),
+    (ADMIN_CLIENT, HOME_URL, '/', HTTPStatus.OK),
+    (ADMIN_CLIENT, LOGIN_URL, '/auth/login/', HTTPStatus.OK),
+    (ADMIN_CLIENT, LOGOUT_URL, '/auth/logout/', HTTPStatus.OK),
+    (ADMIN_CLIENT, SIGNUP_URL, '/auth/signup/', HTTPStatus.OK),
+    (ADMIN_CLIENT, NEWS_DETAIL_URL, '/news/1/', HTTPStatus.OK),
+]
 
 
 @pytest.mark.parametrize(
-    'choosen_client, expected_status', [
-        (CLIENT, HTTPStatus.OK),
-        (ADMIN_CLIENT, HTTPStatus.OK),
-    ]
+    'choosen_client, url_name, url_path, expected_status',
+    CLIENTS_AND_URLS
 )
 def test_page_availability_for_any_user(
-    choosen_client,
-    expected_status,
-    home_url,
-    login_url,
-    logout_url,
-    signup_url,
-    news_detail_url
+    choosen_client, url_name, url_path, expected_status
 ):
     """Доступность страниц YaNews for any user"""
-    home_response = choosen_client.get(home_url)
-    assert home_response.status_code == expected_status
-    login_response = choosen_client.get(login_url)
-    assert login_response.status_code == expected_status
-    logout_response = choosen_client.get(logout_url)
-    assert logout_response.status_code == expected_status
-    signup_response = choosen_client.get(signup_url)
-    assert signup_response.status_code == expected_status
-    detail_response = choosen_client.get(news_detail_url)
-    assert detail_response.status_code == expected_status
+    response = choosen_client.get(url_name)
+    print(response.request['PATH_INFO'], url_path)
+    assert response.status_code == expected_status
+    assert response.request['PATH_INFO'] == url_path
 
 
-def test_redirection_for_anonymous(
-        client,
-        comment_edit_url,
-        comment_delete_url,
-):
-    edit_response = client.get(comment_edit_url)
-    assert edit_response.status_code == HTTPStatus.FOUND
-    assert 'login' in edit_response.url
-
-    delete_response = client.get(comment_delete_url)
-    assert delete_response.status_code == HTTPStatus.FOUND
-    assert 'login' in delete_response.url
+@pytest.mark.parametrize(
+    'url', [COMMENT_EDIT_URL, COMMENT_DELETE_URL]
+)
+def test_redirection_for_anonymous(client, login_url, url):
+    response = client.get(url)
+    assert response.status_code == HTTPStatus.FOUND
+    expected_url = f'{login_url}?next={url}'
+    assert response.url == expected_url

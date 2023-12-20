@@ -1,10 +1,13 @@
+# Standard library imports
 from http import HTTPStatus
-import pytest
 
+# Third-party library imports
+import pytest
 from pytest_django.asserts import (
     assertRedirects
 )
 
+# Local application imports
 from news.forms import BAD_WORDS, WARNING
 from news.models import Comment
 
@@ -31,13 +34,15 @@ BAD_WORDS_DATA = get_bad_words_data
 def test_anonymous_user_cant_create_comment(
         comment_edit_url, login_url, client
 ):
-    """Анонимный пользователь не может отправить комментарий."""
-    comments_before = sorted(Comment.objects.all())
+    """Анонимный пользователь не может создать комментарий."""
+    initial_comments = sorted(Comment.objects.all())
+
     response = client.post(comment_edit_url, data=FORM_DATA)
     expected_url = f'{login_url}?next={comment_edit_url}'
     assertRedirects(response, expected_url)
-    comments_after = sorted(Comment.objects.all())
-    assert comments_before == comments_after
+
+    final_comments = sorted(Comment.objects.all())
+    assert initial_comments == final_comments
 
 
 def test_user_can_create_comment(
@@ -47,16 +52,20 @@ def test_user_can_create_comment(
         author_client,
         author
 ):
-    """Авторизованный пользователь может отправить комментарий."""
+    """Авторизованный пользователь может создать комментарий."""
     response = author_client.post(comment_edit_url, data=FORM_DATA)
     assertRedirects(response, news_detail_url + '#comments')
 
-    if Comment.objects.count() == 1:
-        new_comment = Comment.objects.get()
-        # Сверяем атрибуты объекта с ожидаемыми.
-        assert new_comment.text == FORM_DATA['text']
-        assert new_comment.author == author
-        assert new_comment.news == news
+    assert Comment.objects.count() == 1, (
+        'Expected 1 comment to be created, '
+        f'but found {Comment.objects.count()}'
+    )
+
+    new_comment = Comment.objects.first()
+    # Сверяем атрибуты объекта с ожидаемыми.
+    assert new_comment.text == FORM_DATA['text']
+    assert new_comment.author == author
+    assert new_comment.news == news
 
 
 @pytest.mark.parametrize('word', BAD_WORDS)
@@ -83,9 +92,10 @@ def test_author_can_edit_note(
     response = author_client.post(comment_edit_url, data=FORM_DATA)
     assert response.status_code == HTTPStatus.FOUND
 
-    updated_comment = Comment.objects.get(pk=comment.pk)
-    assert updated_comment.text == FORM_DATA['text']
-    assert updated_comment.news == news
+    changed_comment = Comment.objects.get(pk=comment.pk)
+    assert changed_comment.text == FORM_DATA['text']
+    assert changed_comment.news == news
+    assert changed_comment.author == comment.author
 
 
 def test_author_can_delete_comment(
@@ -94,13 +104,12 @@ def test_author_can_delete_comment(
         comment_delete_url
 ):
     """Авторизованный пользователь может удалять свои комментарии."""
-    comments_before = Comment.objects.count()
-    # assert comment in comments_before
+    initial_number_of_comments = Comment.objects.count()
+
     response = author_client.delete(comment_delete_url)
     assert response.status_code == HTTPStatus.FOUND
-    assert Comment.objects.count() == comments_before - 1
-    comment_exists = Comment.objects.filter(pk=comment.pk).exists()
-    assert not comment_exists
+    assert Comment.objects.count() == initial_number_of_comments - 1
+    assert not Comment.objects.filter(pk=comment.pk).exists()
 
 
 def test_other_user_cant_edit_note(
@@ -124,10 +133,9 @@ def test_other_user_cant_delete_note(
         admin_client, comment, comment_delete_url
 ):
     """Авторизованный пользователь не может удалять чужие комментарии."""
-    comments_before = Comment.objects.count()
+    initial_number_of_comments = Comment.objects.count()
     assert comment in Comment.objects.all()
     response = admin_client.post(comment_delete_url)
     assert response.status_code == HTTPStatus.NOT_FOUND
-    assert Comment.objects.count() == comments_before
-    comment_exists = Comment.objects.filter(pk=comment.pk).exists()
-    assert comment_exists
+    assert Comment.objects.count() == initial_number_of_comments
+    assert Comment.objects.filter(pk=comment.pk).exists()

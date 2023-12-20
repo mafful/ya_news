@@ -28,18 +28,6 @@ def signup_url():
 
 
 @pytest.fixture
-def choosen_client(request, client, admin_client, author_client):
-    client_type = request.param
-
-    if client_type == 'client':
-        return client
-    elif client_type == 'admin_client':
-        return admin_client
-    elif client_type == 'author_client':
-        return author_client
-
-
-@pytest.fixture
 def author(django_user_model):
     return django_user_model.objects.create(username='Автор')
 
@@ -66,15 +54,15 @@ def news_detail_url(news):
 
 @pytest.fixture
 def all_news():
-    news_objects = [
+    today = datetime.today()
+    News.objects.bulk_create([
         News(
             title=f'Новость {index}',
             text='Просто текст.',
-            date=datetime.today() - timedelta(days=index)
+            date=today - timedelta(days=index)
         )
         for index in range(300)
-    ]
-    News.objects.bulk_create(news_objects)
+    ])
 
 
 @pytest.fixture
@@ -99,8 +87,8 @@ def comment_delete_url(comment):
 @pytest.fixture
 def comments(news, author):
     now = timezone.now()
-    comments_objects = [
-        Comment(
+    return [
+        Comment.objects.create(
             news=news,
             author=author,
             text=f'Текст заметки {index}',
@@ -108,4 +96,3 @@ def comments(news, author):
         )
         for index in range(222)
     ]
-    Comment.objects.bulk_create(comments_objects)

@@ -13,8 +13,8 @@ FORM_DATA = {
 def test_news_count(client, home_url, all_news):
     """Количество новостей на главной странице — не более 10."""
     response = client.get(home_url)
-    news_qty = response.context['object_list']
-    assert len(news_qty) == settings.NEWS_COUNT_ON_HOME_PAGE
+    news_quantity_in_response = len(response.context['object_list'])
+    assert news_quantity_in_response == settings.NEWS_COUNT_ON_HOME_PAGE
 
 
 def test_news_order(client, home_url, all_news):
@@ -23,8 +23,8 @@ def test_news_order(client, home_url, all_news):
     Свежие новости в начале списка.
     """
     response = client.get(home_url)
-    news_qty = response.context['object_list']
-    all_dates = [news.date for news in news_qty]
+    news_quantity_in_response = response.context['object_list']
+    all_dates = [news.date for news in news_quantity_in_response]
     assert all_dates == sorted(all_dates, reverse=True)
 
 
@@ -34,15 +34,17 @@ def test_comments_order(client, home_url, comments):
     в хронологическом порядке: старые в начале списка, новые — в конце.
     """
     response = client.get(home_url)
-    news_qty = response.context['object_list']
-    news = news_qty[0]
+    news_quantity_in_response = response.context['object_list']
+    news = news_quantity_in_response[0]
     all_comments_dates = [
         comment.created for comment in news.comment_set.all()
     ]
     assert all_comments_dates == sorted(all_comments_dates)
 
 
-def test_existing_of_form_for_anonymous(client, news, news_detail_url):
+def test_anonymous_user_cannot_access_comment_form(
+        client, news, news_detail_url
+):
     """
     Анонимному пользователю недоступна форма для отправки
     комментария на странице отдельной новости.
@@ -51,7 +53,7 @@ def test_existing_of_form_for_anonymous(client, news, news_detail_url):
     assert 'form' not in response.context
 
 
-def test_existing_of_form_for_authorised_client(
+def test_authorised_client_can_access_comment_form(
         author_client, news_detail_url):
     """
     авторизованному пользователю доступна форма
