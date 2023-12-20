@@ -13,8 +13,10 @@ FORM_DATA = {
 def test_news_count(client, home_url, all_news):
     """Количество новостей на главной странице — не более 10."""
     response = client.get(home_url)
-    news_quantity_in_response = len(response.context['object_list'])
-    assert news_quantity_in_response == settings.NEWS_COUNT_ON_HOME_PAGE
+    quantity_to_be = settings.NEWS_COUNT_ON_HOME_PAGE
+    assert (
+        len(response.context['object_list']) == quantity_to_be
+    )
 
 
 def test_news_order(client, home_url, all_news):
@@ -34,8 +36,7 @@ def test_comments_order(client, home_url, comments):
     в хронологическом порядке: старые в начале списка, новые — в конце.
     """
     response = client.get(home_url)
-    news_quantity_in_response = response.context['object_list']
-    news = news_quantity_in_response[0]
+    news = response.context['object_list'][0]
     all_comments_dates = [
         comment.created for comment in news.comment_set.all()
     ]
