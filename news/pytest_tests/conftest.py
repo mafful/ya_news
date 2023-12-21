@@ -85,6 +85,16 @@ def comment_delete_url(comment):
 
 
 @pytest.fixture
+def comment_edit_redirection_url(login_url, comment_edit_url):
+    return f'{login_url}?next={comment_edit_url}'
+
+
+@pytest.fixture
+def comment_delete_redirection_url(login_url, comment_delete_url):
+    return f'{login_url}?next={comment_delete_url}'
+
+
+@pytest.fixture
 def comments(news, author):
     now = timezone.now()
     for index in range(222):

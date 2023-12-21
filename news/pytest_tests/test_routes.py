@@ -14,6 +14,8 @@ SIGNUP_URL = pytest.lazy_fixture('signup_url')
 NEWS_DETAIL_URL = pytest.lazy_fixture('news_detail_url')
 COMMENT_EDIT_URL = pytest.lazy_fixture('comment_edit_url')
 COMMENT_DELETE_URL = pytest.lazy_fixture('comment_delete_url')
+COMMENT_EDIT_REDIRECTION_URL = pytest.lazy_fixture('comment_edit_redirection_url')
+COMMENT_DELETE_REDIRECTION_URL = pytest.lazy_fixture('comment_delete_redirection_url')
 
 
 CLIENTS_AND_URLS = [
@@ -43,12 +45,12 @@ def test_page_availability_for_any_user(
 
 
 @pytest.mark.parametrize(
-    'url', [
-        COMMENT_EDIT_URL, COMMENT_DELETE_URL
+    'url, redirection_url', [
+        (COMMENT_EDIT_URL, COMMENT_EDIT_REDIRECTION_URL),
+        (COMMENT_DELETE_URL, COMMENT_DELETE_REDIRECTION_URL),
     ]
 )
 def test_redirection_for_anonymous(
-    client, login_url, url
+    client, url, redirection_url
 ):
-    assert client.get(url).status_code == HTTPStatus.FOUND
-    assert client.get(url).url == f'{login_url}?next={url}'
+    assert client.get(url).url == redirection_url

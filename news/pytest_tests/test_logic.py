@@ -126,6 +126,6 @@ def test_other_user_cant_delete_note(
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert Comment.objects.filter(pk=comment.pk).exists()
     comment_after = Comment.objects.get(pk=comment.pk)
-    assert (
-        comment_after == comment
-    )
+    assert comment.text == comment_after.text
+    assert comment.author == comment_after.author
+    assert comment.news == comment_after.news
