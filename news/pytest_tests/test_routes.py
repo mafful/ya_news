@@ -14,8 +14,10 @@ SIGNUP_URL = pytest.lazy_fixture('signup_url')
 NEWS_DETAIL_URL = pytest.lazy_fixture('news_detail_url')
 COMMENT_EDIT_URL = pytest.lazy_fixture('comment_edit_url')
 COMMENT_DELETE_URL = pytest.lazy_fixture('comment_delete_url')
-COMMENT_EDIT_REDIRECTION_URL = pytest.lazy_fixture('comment_edit_redirection_url')
-COMMENT_DELETE_REDIRECTION_URL = pytest.lazy_fixture('comment_delete_redirection_url')
+COMMENT_EDIT_REDIRECTION_URL = (
+    pytest.lazy_fixture('comment_edit_redirection_url'))
+COMMENT_DELETE_REDIRECTION_URL = (
+    pytest.lazy_fixture('comment_delete_redirection_url'))
 
 
 CLIENTS_AND_URLS = [
